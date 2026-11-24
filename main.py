@@ -13,6 +13,7 @@
 # clock, no randomness. Every run writes exactly the same bytes to
 # /output/entry.txt (or $MAKEFUN_OUTPUT_DIR/entry.txt outside the grader).
 
+import hashlib
 import os
 
 # The entry: 116 characters, one line, no trailing newline.
@@ -20,6 +21,11 @@ LINE = ("I was guarding it from burglars all afternoon. No burglars came. "
         "The homework, however, has been secured. Inside me.")
 
 MAX_CHARS = 200
+
+# Pinned digest of the exact bytes this program must write: the 116-char
+# one-line entry encoded as UTF-8 (116 bytes, pure ASCII).
+EXPECTED_SHA256 = "7652cde6dd56078c2c7dd4a95d946aa72fd475133ee30bb33a2c6b642c5e2c87"
+EXPECTED_BYTES = 116
 
 
 def main():
@@ -32,11 +38,22 @@ def main():
     path = os.path.join(out_dir, "entry.txt")
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(line)
-    # Read-back gate: the file on disk must be byte-for-byte the line.
+    # Read-back gate: the file on disk must be byte-for-byte the line —
+    # exact bytes, exact length (116), and the pinned sha256 digest.
     with open(path, "rb") as f:
         written = f.read()
-    assert written == line.encode("utf-8"), "entry.txt differs from the line"
-    assert len(written) == len(line), "entry.txt byte length differs"
+    if written != line.encode("utf-8"):
+        raise SystemExit("read-back mismatch: entry.txt is not the line")
+    if len(written) != EXPECTED_BYTES:
+        raise SystemExit(
+            f"read-back length: found {len(written)} bytes, expected {EXPECTED_BYTES}"
+        )
+    digest = hashlib.sha256(written).hexdigest()
+    if digest != EXPECTED_SHA256:
+        raise SystemExit(
+            f"read-back sha256: found {digest}, expected {EXPECTED_SHA256}"
+        )
+    print(f"verified: {len(line)} chars, sha256 {digest}")
 
 
 if __name__ == "__main__":
